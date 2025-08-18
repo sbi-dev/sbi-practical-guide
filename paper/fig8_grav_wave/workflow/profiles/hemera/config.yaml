@@ -1,0 +1,32 @@
+default-resources:
+  runtime: 45
+  mem_mb: 50000
+  cpus_per_task: 4
+  slurm_partition: "haicu_a100"
+  slurm_account: "haicu"
+  slurm_extra: "'--gres=gpu:1'"
+    
+set-resources:
+  denovo_simulate_single:
+    cpus_per_task: 16
+    threads: 16
+
+  train_npe_nsf_cpu:
+    #AMD EPYC 7282 16-Core dual socket, runtime 3:20:00
+    runtime: 240
+    cpus_per_task: 32
+    slurm_partition: "haicu_a100"
+    slurm_account: "haicu"
+    threads: 32
+    mem_mb: 150000
+
+  train_npe_nsf_gpu:
+    #nvidia A100, runtime 47:08
+    runtime: 60
+    cpus_per_task: 1
+    slurm_partition: "haicu_a100"
+    slurm_account: "haicu"
+    slurm_extra: "'--gres=gpu:1'"
+    mem_mb: 150000
+
+  

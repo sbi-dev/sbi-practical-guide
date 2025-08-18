@@ -1,0 +1,133 @@
+from pathlib import Path
+
+SMK_ROOT = Path(".").resolve()
+CODEROOT = SMK_ROOT
+if SMK_ROOT.parents[-1] == "workflow":
+    CODEROOT = (SMK_ROOT / "..").resolve()
+print(">> code root found at ",CODEROOT)
+#we prefer resimulating rather than reusing data
+#Note: there were problems getting the simulator to install
+#      with all dependencies correctly available
+#
+
+configfile: "workflow/config.yaml"
+if not "preferred_device" in config.keys():
+    config["preferred_device"] = "gpu"
+print(">> preferred device detected as _{}_".format(config["preferred_device"]))
+
+
+ruleorder: denovo_split_data > split_data_manual
+
+rule all:
+    input: "gws-npe-nsf-embed_testobs-42.svg",
+           "gws-sbc-npe-embed-cdf-fullholdout.svg",
+           "gws-sbc-npe-embed-hist-fullholdout.svg",
+           "gws-ppc-npe-embed_testobs-42.svg",
+           "gws-simulator-npe-resim_testobs-42.svg",
+           "gws-prior_predictive_check-sample0.svg"
+
+rule denovo_simulate_single:
+    input:
+        "workflow/scripts/external/config_file_pycbcmaster.ini"
+    output:
+        "denovo-gws-{dataid}.h5"
+    threads: 8
+    log: "script-generate-denovo-gws-{dataid}.log"
+    shell: "python workflow/scripts/script-generate-gws.py -j {threads} -I {wildcards.dataid} -n 7500 > {log} 2>&1 "
+
+rule denovo_simulate_data:
+    input:
+        expand("denovo-gws-{dataid:02.0f}.h5",dataid=list(range(10)))
+    message: f"generated 10 files with gravitational wave signals"
+
+rule split_data_manual:
+    input: expand("thetas-{idx}.pt",idx=range(5)),
+           expand("xs-{idx}.pt",idx=range(5))
+    output:
+        "gws-train.h5", "gws-test.h5"
+    threads: 1
+    script: "scripts/gws-split-data.py"
+
+
+rule denovo_split_data:
+    input:
+        ancient(expand("denovo-gws-{dataid:02.0f}.h5",dataid=list(range(10))))
+    output:
+        "gws-train.h5", "gws-test.h5"
+    threads: 1
+    
+    script: "scripts/gws-split-denovo.py"
+
+
+# rule train_npe_nsf:
+#     input:
+#         "gws-train.h5"
+#     output:
+#         "gws-nsf-npe-{}.pkl".format(config["preferred_device"])
+#     #if this is unequal 1 and no CUDA GPU available, the training will be run on CPU as snakemake sets OMP_NUM_THREADS to something unequal 1
+#     #
+#     threads: 32 if "cpu" in config["preferred_device"] else 1
+#     script: f"{CODEROOT}/gws-train-npe-nsf-embed.py"
+# 
+
+rule train_npe_nsf_cpu:
+    input:
+        "gws-train.h5"
+    output:
+        "gws-nsf-npe-cpu.pkl"
+    message: "running CPU-based Training of NSF density estimator"
+    threads: 32
+    script: f"{CODEROOT}/gws-train-npe-nsf-embed.py"
+
+rule train_npe_nsf_gpu:
+    input:
+        "gws-train.h5"
+    output:
+        "gws-nsf-npe-gpu.pkl"
+    message: "running GPU-based Training of NSF density estimator"
+    threads: 1
+    script: f"{CODEROOT}/gws-train-npe-nsf-embed.py"
+
+rule train_npe_all:
+    input: "gws-nsf-npe-gpu.pkl", "gws-nsf-npe-cpu.pkl"
+
+rule infer_npe:
+    input:
+        "gws-test.h5", "gws-nsf-npe-{}.pkl".format(config["preferred_device"])
+    output:
+        expand("gws-npe-nsf-embed_testobs-{idx}.svg",
+               idx=[42, 380, 43, 322, 216, 214, 347, 47, 100, 425])
+    #if this is unequal 1 and no CUDA GPU available, the training will be run on CPU as snakemake sets OMP_NUM_THREADS to something unequal 1
+        #
+    threads: 1 
+    script: f"{CODEROOT}/gws-infer-npe-nsf-embed.py"
+
+
+rule prior_predictive_check:
+    input:
+        "gws-test.h5", "gws-nsf-npe-{}.pkl".format(config["preferred_device"])
+    output:
+        "gws-prior_predictive_check-sample0.svg"
+    threads: 1 
+    script: f"{CODEROOT}/gws-prior-predictive-check.py"
+
+rule posterior_predictive_check:
+    input:
+        "gws-test.h5", "gws-nsf-npe-{}.pkl".format(config["preferred_device"])
+    output:
+        "gws-ppc-npe-embed_testobs-42.svg", "gws-simulator-npe-resim_testobs-42.svg"
+        #if this is unequal 1 and no CUDA GPU available, the training will be run on CPU as snakemake sets OMP_NUM_THREADS to something unequal 1
+        #
+    threads: 1 
+    script: f"{CODEROOT}/gws-postpredcheck-npe-embed.py"
+
+rule sbc_check_cpu:
+    input:
+        "gws-test.h5", "gws-nsf-npe-{}.pkl".format(config["preferred_device"])
+    output:
+        "gws-sbc-npe-embed-cdf-fullholdout.svg", "gws-sbc-npe-embed-hist-fullholdout.svg"
+        #if this is unequal 1 and no CUDA GPU available, the training will be run on CPU as snakemake sets OMP_NUM_THREADS to something unequal 1
+        #
+    threads: 1 
+    script: f"{CODEROOT}/gws-sbc-npe-embed.py"
+
