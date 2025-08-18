@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "paper"
+version = "0.0.0"
+description = "Package to replicate figures from tutorial paper on sbi."
+authors = [
+    { name = "Michael Deistler", email = "michael.deistler95@gmail.com"},
+]
+classifiers = [
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "Topic :: Adaptive Technologies",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "License :: OSI Approved :: MIT License",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Development Status :: 3 - Alpha",
+]
+requires-python = ">=3.10"
+readme = "README.md"
+keywords = [
+    "Bayesian inference",
+    "Simulation-based inference",
+]
+dependencies = [
+    "sdeint>=0.3.0",
+    "numpy>=1.21.0",
+    "sbi>=0.24.0",
+    "svgutils==0.3.1",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "slow: marks tests as slow (T > 10s)",
+    "regression: marks regression tests",
+    "additional_neuron_tests: tests marked as such will not be run by default",
+]
+
+[tool.isort]
+profile = "black"
+
+[tool.setuptools.packages.find]
+where = ["."]  # list of folders that contain the packages (["."] by default)
+include = ["*"]  # package names should match these glob patterns (["*"] by default)
+exclude = []  # exclude packages matching these glob patterns (empty by default)
