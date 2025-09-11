@@ -1,45 +1,83 @@
-import torch
-import numpy as np
-import random
+import json
 import os
+import random
+import time
+from functools import partial
+from typing import List, Tuple, Type, Union
 
-from typing import Optional, Union, Type, List, Dict, Tuple
-
+import numpy as np
+import pandas as pd
+import torch
+from sbi.inference import SNLE, SNPE, SNRE
+from sbi.inference.posteriors.posterior_parameters import PosteriorParameters
 from sbi.simulators.linear_gaussian import (
     diagonal_linear_gaussian,
     true_posterior_linear_gaussian_mvn_prior,
 )
-from sbi.inference import SNPE, SNLE, SNRE
 from sbi.utils.metrics import c2st
-
-import time
-
-from functools import partial
-import pandas as pd
 
 RESULTS_PATH = "./results.csv"
 
-import os 
 
 def get_results():
+    """Load existing results or initialize empty results DataFrame.
+
+    Ensures a consistent schema including the 'dimension' column.
+    """
+    expected_cols = [
+        "method",
+        "dimension",
+        "sampling_method",
+        "sampling_params",
+        "times",
+        "c2sts",
+    ]
     if not os.path.exists(RESULTS_PATH):
-        df = pd.DataFrame(columns=['method', "sampling_method", "sampling_params", "times", "c2sts" ])
+        df = pd.DataFrame(columns=expected_cols)
         df.to_csv(RESULTS_PATH, index=False)
     else:
         df = pd.read_csv(RESULTS_PATH)
-        
-    return df 
+        # Backfill missing columns if older file exists
+        for col in expected_cols:
+            if col not in df.columns:
+                df[col] = pd.NA
+        # Reorder
+        df = df[expected_cols]
+    return df
 
-def save_results(method:str, d:int, sampling_method:str, sampling_params:dict, times, c2sts):
-    
+
+def save_results(
+    method: str,
+    d: int,
+    sampling_method: str,
+    sampling_params: dict,
+    times,
+    c2sts,
+):
+    """Append benchmark results."""
+
+    if len(times) != len(c2sts):
+        raise ValueError(f"Length mismatch: times({len(times)}) != c2sts({len(c2sts)})")
+
+    n = len(times)
+    # Serialize params (dict) to stable JSON string for CSV storage
+    params_json = json.dumps(sampling_params) if sampling_params is not None else None
     df = get_results()
-    df_append = pd.DataFrame({'method': method, "dimension": d, "sampling_method": sampling_method, "sampling_params": sampling_params, "times": times, "c2sts": c2sts})
-    
+    df_append = pd.DataFrame(
+        {
+            "method": [method] * n,
+            "dimension": [d] * n,
+            "sampling_method": [sampling_method] * n,
+            "sampling_params": [params_json] * n,
+            "times": list(times),
+            "c2sts": list(c2sts),
+        }
+    )
     df = pd.concat([df, df_append], ignore_index=True)
     df.to_csv(RESULTS_PATH, index=False)
-    
-    
-def query(method = None, d = None, sampling_method = None):
+
+
+def query(method=None, d=None, sampling_method=None):
     df = get_results()
     if method is not None:
         df = df[df.method == method]
@@ -47,9 +85,9 @@ def query(method = None, d = None, sampling_method = None):
         df = df[df.dimension == d]
     if sampling_method is not None:
         df = df[df.sampling_method == sampling_method]
-    
+
     return df
-    
+
 
 def d_dim_gaussian_linear_task(d: int):
     # Simple gaussian linear task for a given dimension d
@@ -92,7 +130,7 @@ def train_inference(
     method_inf = method(prior=prior, device=device, show_progress_bars=False)
     _ = method_inf.append_simulations(thetas, xs).train()
 
-    return method_inf,true_posterior
+    return method_inf, true_posterior
 
 
 def benchmark_sample_from_inference(
@@ -100,12 +138,9 @@ def benchmark_sample_from_inference(
     num_samples: int,
     x_o: torch.Tensor,
     sample_with: str,
-    mcmc_parameters: Optional[Dict] = None,
-    mcmc_method = "slice_np",
-    vi_parameters: Optional[Dict] = None,
+    posterior_parameters: PosteriorParameters,
     seeds: List[int] = [1, 2, 3],
 ) -> Tuple[List[torch.Tensor], List[float]]:
-
     samples = []
     times = []
     for seed in seeds:
@@ -113,13 +148,14 @@ def benchmark_sample_from_inference(
 
         if sample_with == "mcmc":
             posterior = method_inf.build_posterior(
-                sample_with=sample_with, mcmc_parameters=mcmc_parameters, mcmc_method=mcmc_method
+                sample_with=sample_with,
+                posterior_parameters=posterior_parameters,
             )
         elif sample_with == "direct":
             posterior = method_inf.build_posterior()
         elif sample_with == "vi":
             posterior = method_inf.build_posterior(
-                sample_with=sample_with, vi_parameters=vi_parameters
+                sample_with=sample_with, posterior_parameters=posterior_parameters
             )
         else:
             raise ValueError(f"Unknown sampling method: {sample_with}")
@@ -137,7 +173,11 @@ def benchmark_sample_from_inference(
     return samples, times
 
 
-def eval_samples(samples: List[torch.Tensor], true_posterior: torch.distributions.Distribution, seed:int = 42):
+def eval_samples(
+    samples: List[torch.Tensor],
+    true_posterior: torch.distributions.Distribution,
+    seed: int = 42,
+):
     # Evaluate samples using the true posterior
     set_seed(seed)
     c2st_values = []
@@ -145,7 +185,6 @@ def eval_samples(samples: List[torch.Tensor], true_posterior: torch.distribution
     for sample in samples:
         c2st_values.append(float(c2st(sample, reference_samples)))
     return c2st_values
-    
 
 
 def set_seed(seed: int):
