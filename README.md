@@ -59,6 +59,10 @@ uv sync
 If you prefer a different environment manager, you can use `pyproject.toml` as a
 reference for the required dependencies, but we only test with `uv`.
 
+Note that for the `gw` and `pyloric` examples, additional installatations are required.
+The installation instructions are found under `examples/4_1_grav_waves` and 
+`examples/4_3_pyloric` folders respectively.
+
 ---
 
 ## Large files and pre-simulated data (Git LFS)
