@@ -1,0 +1,16 @@
+sbi==0.23.3
+jupytext
+ipykernel #required by jupytext --execute
+nbconvert #required by jupytext --execute
+h5py
+hdf5plugin
+hypothesis==0.4.0
+#see https://github.com/ahnitz/ligo-segments/issues/1 for dependencies of pycbc
+#pycbc>2.7
+git+https://github.com/gwastro/pycbc@master #requires gcc>9.3 to build
+lalsuite #required for pycbc to run, restricted to python <=3.11 for now
+scipy<1.13 #sbi::arviz otherwise complains that gaussian is not part of scipy.signal
+loguru
+click
+svgutils<=0.3.1
+numpy<2
