@@ -18,4 +18,4 @@ python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu tor
 
 
 The generated simulations and saved diagnostic results used in the notebook
-`4_1_grav_waves.ipynb` are available upon request via a new issue.
+`4_1_grav_waves.ipynb` (~2.5GB) are available upon request via a new issue.
