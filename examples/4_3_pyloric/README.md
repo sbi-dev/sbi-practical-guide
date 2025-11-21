@@ -6,4 +6,4 @@ tutorial paper, and to run `pip install .` while using the environment created f
 project.
 
 The generated simulations and saved diagnostic results used in the notebook
-`4_3_pyloric.ipynb` are obtained with `git-lfs` as described in the [README](https://github.com/sbi-dev/sbi-practical-guide).
+`4_3_pyloric.ipynb` are available upon request via a new issue.
